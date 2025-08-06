@@ -50,4 +50,4 @@
 
 ## Контакты
 
-Если у вас есть вопросы или предложения, пожалуйста, свяжитесь с разработчиком по email me@karabedyan.ru или в telegram @kaetosh
+Если у вас есть вопросы или предложения, пожалуйста, свяжитесь с разработчиком по email me@karabedyan.ru или в telegram [@kaetosh](https://t.me/kaetosh)
