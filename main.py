@@ -18,8 +18,9 @@ import tempfile
 import shlex
 from pathlib import Path
 from tqdm import tqdm
-
-from support_functions import fix_1c_excel_case, normalize_path, validate_paths
+from colorama import init, Fore, Style
+init(autoreset=True)
+from support_functions import fix_1c_excel_case, normalize_path, validate_paths, print_instruction_color
 from custom_errors import NoExcelFilesFoundError, RegisterProcessingError, NoRegisterFilesFoundError, IncorrectFolderOrFilesPath
 
 
@@ -65,7 +66,7 @@ class UPPFileProcessor(FileProcessor):
         if mask.any():
             date_row_idx = mask.idxmax()
         else:
-            raise RegisterProcessingError('Файл не является карточкой счета 1с.\n')
+            raise RegisterProcessingError(Fore.RED + 'Файл не является карточкой счета 1с.\n')
         
         # Установка заголовков и очистка
         df.columns = df.iloc[date_row_idx].str.strip()
@@ -109,7 +110,7 @@ class UPPFileProcessor(FileProcessor):
         df = UPPFileProcessor._process_dataframe_optimized(df)
 
         if df.empty:
-            raise RegisterProcessingError(f"Карточка 1с пустая в файле {file_path.name}, обработка невозможна.\n")
+            raise RegisterProcessingError(Fore.RED + f"Карточка 1с пустая в файле {file_path.name}, обработка невозможна.\n")
         
         # Оптимизированный pivot (без медленного apply)
         
@@ -191,7 +192,7 @@ class NonUPPFileProcessor(FileProcessor):
         index = df.index[df.iloc[:, 0] == 'Период'].tolist()
         if not index:
             # Можно вернуть пустой df или поднять исключение
-            raise RegisterProcessingError('Не найден заголовок Период в шапке таблицы')
+            raise RegisterProcessingError(Fore.RED + 'Не найден заголовок Период в шапке таблицы')
         header_row = index[0]
         df.columns = df.iloc[header_row]
         df = df.iloc[header_row + 1:].reset_index(drop=True)
@@ -226,7 +227,7 @@ class NonUPPFileProcessor(FileProcessor):
         df.insert(0, 'Имя_файла', file_name)
         
         if df.empty:
-            raise RegisterProcessingError(f"Карточка 1с пустая в файле {file_path.name}, обработка невозможна. Файл не УПП\n")
+            raise RegisterProcessingError(Fore.RED + f"Карточка 1с пустая в файле {file_path.name}, обработка невозможна. Файл не УПП\n")
         return df
 
 
@@ -310,7 +311,7 @@ class FileHandler:
 
         processor = self.processor_factory.get_processor(file_path)
         if self.verbose:
-            print(f'    {file_path.name}')
+            print('Файл в обработке...', end='\r')
         result = processor.process_file(file_path)
         self.storage_processed_registers[file_path.name]=result
         # self._save_and_open_result(result)
@@ -350,7 +351,7 @@ class FileHandler:
                 df_pivot_non_upp = pd.concat(non_upp_results) if non_upp_results else pd.DataFrame()
                 self._save_combined_results(df_pivot_upp, df_pivot_non_upp)
             else:
-                raise NoRegisterFilesFoundError('В папке не найдены карточки счета 1С')
+                raise NoRegisterFilesFoundError(Fore.RED + 'В папке не найдены карточки счета 1С')
         finally:
             # Восстанавливаем оригинальное значение
             self.verbose = original_verbose
@@ -368,7 +369,7 @@ class FileHandler:
         if list_excel_files:
             return list_excel_files
         else:
-            raise NoExcelFilesFoundError("В папке нет файлов Excel.")
+            raise NoExcelFilesFoundError(Fore.RED + "В папке нет файлов Excel.")
 
 
 
@@ -413,7 +414,7 @@ class FileHandler:
         if sys.platform == "win32":
             os.startfile(temp_filename)
             if self.verbose:
-                print('Обработка завершена                                                      ', end='\r')
+                print('Обработка завершена                                                      ')
         elif sys.platform == "darwin":
             subprocess.run(["open", temp_filename])
         else:
@@ -444,6 +445,7 @@ class FileHandler:
             subprocess.run(["open", temp_filename])
         else:
             subprocess.run(["xdg-open", temp_filename])
+        print('Обработка завершена                                                      ')
 
 
 class UserInterface:
@@ -452,7 +454,7 @@ class UserInterface:
     @staticmethod
     def get_input() -> list[Path]:
         """Получить список путей к файлам/папкам от пользователя"""
-        print("\nПеретащите файл карточки 1С (.xlsx) или папку и нажмите Enter:\n")
+        print(Fore.YELLOW + "\nПеретащите файл карточки 1С (.xlsx) или папку и нажмите Enter:")
         input_str = input().strip()
         input_str = input_str.replace('\\', '/')
         # Разбиваем строку с учётом кавычек
@@ -461,35 +463,19 @@ class UserInterface:
         if validate_paths(paths):
             return paths
         else:
-            raise IncorrectFolderOrFilesPath('Неверные пути к папке или файлу/файлам.')
+            raise IncorrectFolderOrFilesPath(Fore.RED + 'Неверные пути к папке или файлу/файлам.')
 
 
 def main():
-    print(
-        """Обработчик Карточки счета 1С.
-Формирует плоскую таблицу из отдельных регистров или из нескольких в пакетном режиме.
-Если нужно обработать регистры по отдельности, перетаскивайте файл в окно программы.
-В этом случае обработанные регистры будут открываться в отдельном excel-файле.
-
-Если необходим файл, где все регистры будут представлены в сводной таблице, то перетягивайте папку с файлами в окно программы.
-В этом случае обработанные регистры будут расположены на одном листе excel-файла.
-
-Программа распознает выгрузки из следующих версий 1С: Предприятие 8.3, а именно
-1. Конфигурация "Управление производственным предприятием". В этом варианте Карточка счета имеет следующие заголовки столбцов
-|Дата|Документ|Операция|
-2. Конфигурации "Бухгалтерия предприятия", "1С: ERP Агропромышленный комплекс", "1С: ERP Управление предприятием 2". В этом варианте Карточка счета имеет следующие заголовки столбцов
-|Период|Документ|Аналитика Дт|Аналитика Кт|
-3. Прочие конфигурации, если Карточка счета имеет заголовки столбцов из п. 1 или 2
-Из-за данных отличий скрипт, обрабатывая регистры в пакетном режиме, сохраняет результаты на отдельных листах excel файла (UPP и Non_UPP).
-""")
+    print_instruction_color()
     ui = UserInterface()
     file_handler = FileHandler()
 
     while True:
         try:
             input_paths = ui.get_input()
-            if input_paths[0].is_file():
-                print('\nОбработанные файлы:')
+            # if input_paths[0].is_file():
+            #     print('\nОбработанные файлы:')
             for input_path in input_paths:
                 try:
                     file_handler.handle_input(normalize_path(input_path))
@@ -498,7 +484,7 @@ def main():
                     file_handler.not_correct_files.append(input_path.name)
                     continue
                 except Exception as e:
-                    print(f'\n{e}\n')
+                    print(f'{e}')
                     # import traceback
                     # traceback.print_exc()
                     if input_path.is_file():
@@ -509,14 +495,14 @@ def main():
                 file_handler._save_and_open_batch_result(file_handler.storage_processed_registers)
 
         except Exception as e:
-            print(f'\n{e}\n')
+            print(f'{e}')
             # import traceback
             # traceback.print_exc()
         finally:
             if file_handler.not_correct_files:
-                print('Нижеследующие файлы .xlsx не распознаны как Карточки счета 1С:                 \n', end='\r')
+                print(Fore.RED + 'Нижеследующие файлы .xlsx не распознаны как Карточки счета 1С:                 \n', end='\r')
                 for i in file_handler.not_correct_files:
-                    print('   ', i)
+                    print(Fore.RED + f'    {i}')
                 file_handler.not_correct_files.clear()
             if file_handler.storage_processed_registers:
                 file_handler.storage_processed_registers.clear()

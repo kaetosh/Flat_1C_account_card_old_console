@@ -11,6 +11,43 @@ from pathlib import Path
 from typing import List
 from custom_errors import PermissionFileExcelError
 
+from colorama import init, Fore, Style
+init(autoreset=True)
+
+def print_instruction_color():
+    print(Fore.CYAN + "="*60)
+    print(Fore.CYAN + "Обработчик Карточки счета 1С".center(60))
+    print(Fore.CYAN + "формирует плоскую таблицу из отдельных регистров".center(60))
+    print(Fore.CYAN + "или из нескольких в пакетном режиме".center(60))
+    print(Fore.CYAN + "="*60 + "\n")
+
+    # print("Функции скрипта:")
+    # print(" - Формирует плоскую таблицу из отдельных регистров или из нескольких в пакетном режиме.\n")
+    
+    print(Fore.YELLOW + "Режимы работы:")
+    print(Fore.YELLOW + " 1) Обработка регистров по отдельности:")
+    print(Style.RESET_ALL + "    - Перетягивайте файл в окно программы.")
+    print("    - Обработанные регистры будут открываться в отдельном Excel-файле.\n")
+    
+    print(Fore.YELLOW + " 2) Пакетная обработка (сводная таблица):")
+    print(Style.RESET_ALL + "    - Перетягивайте папку с файлами в окно программы.")
+    print("    - Результаты будут расположены на одном листе Excel-файла.\n")
+    
+    print(Fore.YELLOW + "Поддерживаемые версии 1С и особенности:")
+    print(Style.RESET_ALL + " 1) Конфигурация \"Управление производственным предприятием\" (1С 8.3):")
+    print("    - Заголовки столбцов: |Дата|Документ|Операция|\n")
+    
+    print(" 2) Конфигурации \"Бухгалтерия предприятия\", \"1С: ERP Агропромышленный комплекс\",")
+    print("    \"1С: ERP Управление предприятием 2\":")
+    print("    - Заголовки столбцов: |Период|Документ|Аналитика Дт|Аналитика Кт|\n")
+
+    print(" 3) Прочие конфигурации, если заголовки соответствуют п.1 или п.2.\n")
+
+    print(Fore.YELLOW + "Особенности пакетной обработки:")
+    print(Style.RESET_ALL + " - Результаты сохраняются на отдельных листах Excel-файла с названиями UPP и Non_UPP.\n")
+
+    print(Fore.CYAN + "="*60)
+
 def validate_paths(paths: List[Path]) -> bool:
     if not isinstance(paths, list) or not paths:
         return False  # не список или пустой список — False
