@@ -110,6 +110,80 @@ class UPPFileProcessor(FileProcessor):
         
         # Обработка DataFrame
         df = UPPFileProcessor._process_dataframe_optimized(df)
+        
+        
+        
+        
+        
+        # Отработка столбцов с количеством
+        df_with_count = pd.DataFrame()
+        if (df['Операция'] == 'Кол-во').any():
+            df_with_count = df[df['Операция']=='Кол-во']
+            # df_with_count = df_with_count.dropna(axis=1, how='all')
+            
+            # Получаем индексы столбцов 'Дт' и 'Кт'
+            dt_index = df_with_count.columns.get_loc('Дебет')
+            kt_index = df_with_count.columns.get_loc('Кредит')
+            
+            # Преобразуем столбцы в числовые, некорректные значения станут NaN
+            dt_col = pd.to_numeric(df_with_count.iloc[:, dt_index], errors='coerce')
+            dt_next_col = pd.to_numeric(df_with_count.iloc[:, dt_index + 1], errors='coerce')
+            
+            kt_col = pd.to_numeric(df_with_count.iloc[:, kt_index], errors='coerce')
+            kt_next_col = pd.to_numeric(df_with_count.iloc[:, kt_index + 1], errors='coerce')
+            
+            # Суммируем, игнорируя NaN (если хотите считать NaN как 0, можно заменить их)
+            df_with_count['Дт_количество'] = dt_col.loc[:].fillna(0) + dt_next_col.loc[:].fillna(0)
+            df_with_count['Кт_количество'] = kt_col.loc[:].fillna(0) + kt_next_col.loc[:].fillna(0)
+            df_with_count = df_with_count[['Документ', 'Дт_количество', 'Кт_количество']].copy()
+    
+        
+        # Удаляем строки с количеством
+        df = df[df['Операция'] != 'Количество']
+        
+        # Отработка столбцов с валютой
+        df_with_currency = pd.DataFrame()
+        if (df['Операция'] == 'В валюте :').any():
+            df_with_currency = df[df['Операция']=='В валюте :']
+            # df_with_currency = df_with_currency.dropna(axis=1, how='all')
+            
+            
+            # Получаем индексы столбцов 'Дт' и 'Кт'
+            dt_index = df_with_currency.columns.get_loc('Дебет')
+            kt_index = df_with_currency.columns.get_loc('Кредит')
+            
+
+            # Комплексная замена всех видов "пустых" значений на NaN
+            df_with_currency.replace(
+                [np.nan, '\n', '\t', ' '],  # Явные замены
+                '',
+                inplace=True,
+            )
+
+            df_with_currency.replace(
+                r'^\s+$',  # Регулярное выражение для строк из любых пробельных символов
+                '',
+                inplace=True,
+                regex=True
+            )
+            df_with_currency.to_excel('0123.xlsx')
+            df_with_currency['Дт_валюта'] = df_with_currency.loc[:,'Дебет']
+            df_with_currency['Дт_валютая_сумма'] = df_with_currency.iloc[:, dt_index + 1]
+            df_with_currency['Кт_валюта'] = df_with_currency.loc[:, 'Кредит']
+            df_with_currency['Кт_валютая_сумма'] = df_with_currency.iloc[:, kt_index + 1]
+            df_with_currency = df_with_currency[['Документ', 'Дт_валюта', 'Дт_валютая_сумма', 'Кт_валюта', 'Кт_валютая_сумма']].copy()
+            
+            df_with_currency.to_excel('123.xlsx')
+            
+    
+        
+        # # Удаляем строки с количеством
+        df = df[df['Операция'] != 'В валюте :']
+        
+        
+        
+        
+        
 
         if df.empty:
             raise RegisterProcessingError(Fore.RED + f"Карточка 1с пустая в файле {file_path.name}, обработка невозможна.\n")
@@ -488,8 +562,8 @@ def main():
                     continue
                 except Exception as e:
                     print(f'{e}')
-                    # import traceback
-                    # traceback.print_exc()
+                    import traceback
+                    traceback.print_exc()
                     if input_path.is_file():
                         file_handler.not_correct_files.append(input_path.name)
                     continue
